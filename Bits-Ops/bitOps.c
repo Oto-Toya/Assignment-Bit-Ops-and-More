@@ -1,124 +1,95 @@
 /* File: bitOps.c
  * Author: Denis Myer
- * Last Edited: Gary Hubley
- * Date: 2026/02/04
+ * Last Edited: Gary Hubley - WenXing Tan
+ * Date: 2026/02/12
  * Description: DEMONSTRATION OF BOOLEAN AND SHIFT, BIT OPERATIONS
  */
-#include <linux/kd.h>
+#include <linux/kd.h>           // KDSETLED
 #include <stdio.h>
-#include <sys/ioctl.h>
-#include <sys/time.h>
-#include <sys/timeb.h>
-#include <sys/types.h>
-#include <termios.h>
-#include <time.h>
-#include <unistd.h>
-void changemode(int mode);
-int kbhit(void);
-long long GetTimeMS(void);
-void DelayMS(long long);
+#include <sys/ioctl.h>          // ioctl() for KDSETLED
+#include <sys/time.h>           // select() for kbhit()
+#include <sys/types.h>          // select() for kbhit()
+#include <termios.h>            // termios for changemode()
+#include <unistd.h>             // STDIN_FILENO for kbhit(), usleep() for DelayMS()
 
+void changemode(int mode);      // 1 for non-blocking, 0 for blocking
+int kbhit(void);                // Returns 1 if keyboard input is available, 0 otherwise
+void DelayMS(long long ms);     // Delays execution for a specified number of milliseconds
+
+// Main function demonstrating bit operations and keyboard interaction
 int main(void) {
   int bitmode = 1;
-  char ch;
-  int delayTimeMS = 500;
-  changemode(1);
-  while (ch != 'q' || ch != 'Q') {
-    while (!kbhit()) {
-      DelayMS(500);
-      if (ch == 'l') {
+  char ch = '\0';
+  changemode(1);                // Set terminal to non-blocking mode
 
-        bitmode = bitmode << 1;
+  // Main loop to handle keyboard input and LED control
+  // The loop continues until 'q' or 'Q' is pressed
+  while (ch != 'q' && ch != 'Q') {
+    while (!kbhit()) {          // Loop until a key is pressed
+      DelayMS(500);             // Delay to control the speed of LED changes
 
-        if (bitmode == 8) {
+      if (ch == 'l') {          // If 'l' is pressed, shift the bitmode left
+        bitmode = bitmode << 1; // Shift left to move to the next LED
+
+        if (bitmode == 8) {     // If bitmode exceeds 7 (0b111), reset to 1 (0b001)
           bitmode = 1;
         }
-        ioctl(1, KDSETLED, bitmode);
-      }
+        ioctl(1, KDSETLED, bitmode); // Update the LED state based on the current bitmode
+      } else if (ch == 'r') {   // If 'r' is pressed, shift the bitmode right
+        bitmode = bitmode >> 1; // Shift right to move to the previous LED
 
-      else if (ch == 'r') {
-        bitmode = bitmode >> 1;
-        if (bitmode == 0) {
+        if (bitmode == 0) {     // If bitmode becomes 0 (no LEDs), reset to 4 (0b100) to light the last LED
           bitmode = 4;
         }
-
-        ioctl(1, KDSETLED, bitmode);
+        ioctl(1, KDSETLED, bitmode); // Update the LED state based on the current bitmode
       }
     }
 
-    ch = getchar();
+    ch = getchar();             // Read the pressed key
 
-    if (ch == 'l' || ch == 'L') {
-      printf("\nL\n");
-    } else if (ch == 'r' || ch == 'R') {
-      printf("\nR\n");
-    } else if (ch == 'q' || ch == 'Q') {
+    // Check if the pressed key is 'q' or 'Q' to quit the program, returns to normal terminal mode before exiting
+    if (ch == 'q' || ch == 'Q') {
       printf("\nQuit\n");
       changemode(0);
       return 0;
     }
-
-    /*
-      unsigned char A, B, C, D, E, F;
-      A = 0x34;  // 0011 0100 //
-      B = 0x27;  // 0010 0111 //
-      C = A & B; // 0010 0100 //
-      D = A | B; // 0011 0111 //
-      E = A ^ B; // 0001 0011 //
-      F = ~A;    // 1100 1011 //
-      printf("BOOLEAN OPERATIONS\n");
-      printf("A = (0011 0100) = %x\n", A);
-      printf("B = (0010 0111) = %x\n", B);
-      printf("A AND B (0010 0100) = %x\n", C);
-      printf("A OR B (0011 0111) = %x\n", D);
-      printf("A XOR B (0001 0011) = %x\n", E);
-      printf("NOT A (1100 1011) = %x\n", F);
-      printf("SHIFT OPERATIONS\n");
-      A = 0x34;   // 0011 0100 //
-      B = A << 1; // 0110 1000Z ZERO FILL //
-      C = A >> 2; // 0000 1101 //
-      printf("A = (0011 0100) = %x\n", A);
-      printf("SHIFT LEFT ONE (0110 1000) = %x\n", B);
-      printf("SHIFT RIGHT TWO (0000 1101) = %x\n", C);
-
-      return (0);
-    */
-    ioctl(1, KDSETLED, bitmode);
+    ioctl(1, KDSETLED, bitmode); // Update the LED state based on the current bitmode after processing the key press
   }
+
+  changemode(0);
+  return 0;
 }
 
+// Function to change terminal mode for non-blocking input
 void changemode(int mode) {
-  static struct termios oldt, newt;
+  static struct termios oldt, newt; // Static variables to store terminal settings
+
+  // If mode is 1, set terminal to non-blocking mode; if mode is 0, restore original terminal settings
   if (mode == 1) {
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    tcgetattr(STDIN_FILENO, &oldt);    // Get current terminal settings and store in oldt
+    newt = oldt;                       // Copy old settings to newt
+    newt.c_lflag &= ~(ICANON | ECHO); // Disable canonical mode and echoing of input characters
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt); // Apply new terminal settings immediately
   } else {
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt); // Restore original terminal settings immediately
   }
 }
 
+// Function to check if a keyboard key has been hit (non-blocking)
 int kbhit(void) {
-  struct timeval timeout;
-  fd_set rdfs;
-  timeout.tv_sec = 0;
-  timeout.tv_usec = 0;
-  FD_ZERO(&rdfs);
-  FD_SET(STDIN_FILENO, &rdfs);
-  select(STDIN_FILENO + 1, &rdfs, NULL, NULL, &timeout);
-  return FD_ISSET(STDIN_FILENO, &rdfs);
+  struct timeval timeout;       // Structure to specify the timeout for select()
+  fd_set rdfs;                  // Set of file descriptors to be monitored for reading
+
+  timeout.tv_sec = 0;           // Set timeout to 0 seconds for non-blocking behavior
+  timeout.tv_usec = 0;          // Set timeout to 0 microseconds for non-blocking behavior
+  FD_ZERO(&rdfs);               // Clear the set of file descriptors
+  FD_SET(STDIN_FILENO, &rdfs);  // Add standard input (keyboard) to the set of file descriptors to be monitored
+  select(STDIN_FILENO + 1, &rdfs, NULL, NULL, &timeout); // Monitor the file descriptors for reading with the specified timeout
+
+  return FD_ISSET(STDIN_FILENO, &rdfs); // Return 1 if standard input is ready for reading (a key has been hit), otherwise return 0
 }
 
-long long GetTimeMS(void) {
-  struct timeb time;
-  ftime(&time);
-  return (long long)time.time * 1000 + time.millitm;
-}
-
+// Function to delay execution for a specified number of milliseconds
 void DelayMS(long long ms) {
-  long long start = GetTimeMS();
-
-  while (GetTimeMS() - start < ms) {
-  }
+  usleep(ms * 1000);            // Use usleep() for efficient sleep instead of busy waiting
 }
