@@ -89,7 +89,18 @@ int kbhit(void) {
   return FD_ISSET(STDIN_FILENO, &rdfs); // Return 1 if standard input is ready for reading (a key has been hit), otherwise return 0
 }
 
+long long GetTimeMS(void) {
+  struct timeb time;
+  ftime(&time);
+  return (long long)time.time * 1000 + time.millitm;
+}
+
 // Function to delay execution for a specified number of milliseconds
 void DelayMS(long long ms) {
-  usleep(ms * 1000);            // Use usleep() for efficient sleep instead of busy waiting
+  long long start = GetTimeMS();
+
+  while (GetTimeMS() - start < ms) {
+    if (kbhit())
+      break;
+  }
 }
